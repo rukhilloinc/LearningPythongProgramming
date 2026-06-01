@@ -104,13 +104,23 @@
   .checking-indicator { text-align: center; padding: 12px; color: #90caf9; font-size: 0.9rem; display: none; }
   .dot-flashing { display: inline-block; animation: dotFlash 1.2s infinite; }
   @keyframes dotFlash { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+  .api-key-row { display: flex; gap: 10px; align-items: center; }
+  .api-key-row input { flex: 1; background: #0d1b2e; border: 2px solid #2a3a5c; border-radius: 10px; padding: 12px 16px; color: #e8eaf6; font-size: 0.9rem; font-family: monospace; transition: border-color 0.2s; }
+  .api-key-row input:focus { outline: none; border-color: #42a5f5; }
+  .api-key-row button { background: #4a148c; color: white; border: none; border-radius: 10px; padding: 12px 16px; cursor: pointer; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+  .api-key-row button:hover { background: #6a1fb5; }
+  #ai-status { margin-top: 10px; font-size: 0.85rem; padding: 8px 12px; border-radius: 8px; display: none; }
+  #ai-status.on { background: #1b5e20; color: #69f0ae; border: 1px solid #43a047; }
+  #ai-status.off { background: #1a2233; color: #90caf9; border: 1px solid #2a3a5c; }
+  .ai-badge { display: inline-block; background: #4a148c; color: #ce93d8; font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; vertical-align: middle; margin-left: 6px; letter-spacing: 1px; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>🇺🇸 US Civics Practice Test</h1>
-  <p>2025 USCIS N-400 Naturalization — 128 Official Questions</p>
+  <p>2025 USCIS N-400 Naturalization — 128 Official Questions &nbsp;<span id="ai-header-badge" style="display:none" class="ai-badge">AI ON</span></p>
 </header>
 
 <div class="container">
@@ -134,6 +144,16 @@
         <div class="count-btn" data-count="40" onclick="selectCount(this)">40</div>
         <div class="count-btn" data-count="128" onclick="selectCount(this)">All 128</div>
       </div>
+    </div>
+
+    <div class="setup-card">
+      <h2>AI Grading <span style="font-size:0.7rem;color:#90caf9;font-weight:400;text-transform:none;letter-spacing:0">(optional — understands context, typos, paraphrasing)</span></h2>
+      <div class="api-key-row">
+        <input type="password" id="api-key-input" placeholder="sk-ant-api03-…  (Anthropic API key)" autocomplete="off">
+        <button onclick="saveApiKey()">Save</button>
+      </div>
+      <div id="ai-status"></div>
+      <div style="margin-top:8px;font-size:0.78rem;color:#546e7a;">Your key is stored only in this browser tab. Get one free at console.anthropic.com</div>
     </div>
 
     <div class="setup-card">
@@ -543,6 +563,71 @@ function gradeAnswer(question, userAnswer) {
   return question.answers.some(ans => containsAnswer(u, ans));
 }
 
+// ─── AI Grading ───────────────────────────────────────────────────────────────
+let anthropicApiKey = "";
+
+function saveApiKey() {
+  const key = document.getElementById("api-key-input").value.trim();
+  const status = document.getElementById("ai-status");
+  const badge = document.getElementById("ai-header-badge");
+  if (key.startsWith("sk-ant-") || key.startsWith("sk-")) {
+    anthropicApiKey = key;
+    status.style.display = "block";
+    status.className = "on";
+    status.textContent = "✓ AI grading enabled — Claude will evaluate your answers contextually";
+    badge.style.display = "inline-block";
+  } else if (!key) {
+    anthropicApiKey = "";
+    status.style.display = "block";
+    status.className = "off";
+    status.textContent = "AI grading off — using keyword matching";
+    badge.style.display = "none";
+  } else {
+    status.style.display = "block";
+    status.className = "off";
+    status.textContent = "Key doesn't look right — should start with sk-ant-";
+    badge.style.display = "none";
+  }
+}
+
+async function gradeWithAI(question, userAnswer) {
+  const acceptedList = question.answers.slice(0, 20).join("; ");
+  const minNote = question.minAnswers > 1 ? ` The student must name at least ${question.minAnswers} correct items.` : "";
+
+  const prompt = `You are grading a US citizenship civics test answer. Be generous — accept paraphrasing, synonyms, different word order, and minor typos. Only mark wrong if the answer is clearly incorrect or off-topic.
+
+Question: ${question.q}
+Official accepted answers (any one is sufficient unless noted): ${acceptedList}${minNote}
+
+Student's answer: "${userAnswer}"
+
+Reply with exactly one word: CORRECT or INCORRECT`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-calls": "true",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 10,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const verdict = (data.content?.[0]?.text || "").trim().toUpperCase();
+  return verdict.includes("CORRECT");
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 let allQuestions = [];
 let quizQuestions = [];
@@ -627,7 +712,7 @@ function showQuestion() {
   }
 }
 
-function submitAnswer() {
+async function submitAnswer() {
   if (answered) return;
   answered = true;
   const q = quizQuestions[currentIndex];
@@ -641,17 +726,49 @@ function submitAnswer() {
     return;
   }
 
-  const result = gradeAnswer(q, userAnswer);
-
-  if (result === null) {
-    // Can't grade (rep question etc.)
+  // Can't grade state-varies with no state set
+  const keywordResult = gradeAnswer(q, userAnswer);
+  if (keywordResult === null) {
     showFeedback(null, q, userAnswer, "This answer varies by district/location — self-check below.");
-  } else if (result) {
-    correct++;
-    showFeedback(true, q, userAnswer, "");
+    document.getElementById("score-display").textContent = `Score: ${correct}/${currentIndex + 1}`;
+    return;
+  }
+
+  // Use AI if key is set
+  if (anthropicApiKey) {
+    const checking = document.getElementById("checking");
+    checking.style.display = "block";
+    document.getElementById("submit-btn").style.display = "none";
+    try {
+      const aiResult = await gradeWithAI(q, userAnswer);
+      checking.style.display = "none";
+      if (aiResult) {
+        correct++;
+        showFeedback(true, q, userAnswer, "✨ AI graded");
+      } else {
+        showFeedback(false, q, userAnswer, "");
+        missedItems.push({ q, userAnswer });
+      }
+    } catch (e) {
+      checking.style.display = "none";
+      // Fall back to keyword on API error
+      if (keywordResult) {
+        correct++;
+        showFeedback(true, q, userAnswer, `(AI unavailable: ${e.message}) — keyword match`);
+      } else {
+        showFeedback(false, q, userAnswer, `(AI unavailable: ${e.message})`);
+        missedItems.push({ q, userAnswer });
+      }
+    }
   } else {
-    showFeedback(false, q, userAnswer, "");
-    missedItems.push({ q, userAnswer });
+    // Keyword-only mode
+    if (keywordResult) {
+      correct++;
+      showFeedback(true, q, userAnswer, "");
+    } else {
+      showFeedback(false, q, userAnswer, "");
+      missedItems.push({ q, userAnswer });
+    }
   }
 
   document.getElementById("score-display").textContent = `Score: ${correct}/${currentIndex + 1}`;
