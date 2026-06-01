@@ -211,7 +211,7 @@
 </div>
 
 <script>
-// ─── State Data ───────────────────────────────────────────────────────────────────────────────
+// ─── State Data ───────────────────────────────────────────────────────────────
 const STATE_DATA = {
   AL: { name: "Alabama", capital: "Montgomery", governor: "Kay Ivey", senators: ["Tommy Tuberville", "Katie Britt"] },
   AK: { name: "Alaska", capital: "Juneau", governor: "Mike Dunleavy", senators: ["Lisa Murkowski", "Dan Sullivan"] },
@@ -342,8 +342,7 @@ function getStateFromZip(zip) {
   return ZIP_STATE_MAP[zip.substring(0, 3)] || null;
 }
 
-// ─── Questions Database ────────────────────────────────────────────────────────────────────────────
-const STATE_DATA = {    // <-- duplicate removed in actual push, this is just a structural note
+// ─── Questions Database ───────────────────────────────────────────────────────
 // starred = eligible for 65/20 special consideration
 // type: 'state' means answer depends on state; 'current' means changes with elections
 // minAnswers: how many correct answers required (for "name two", "name five" etc.)
@@ -489,7 +488,7 @@ function buildQuestions() {
   ];
 }
 
-// ─── Grading ───────────────────────────────────────────────────────────────────────────────
+// ─── Grading ──────────────────────────────────────────────────────────────────
 function normalize(str) {
   return str.toLowerCase()
     .replace(/['']/g, "'")
@@ -550,7 +549,7 @@ function gradeAnswer(question, userAnswer) {
     return matchCount >= question.minAnswers;
   }
 
-  // Special: three branches -- must mention all three
+  // Special: three branches — must mention all three
   if (question.special === "three_branches") {
     return u.includes("legislat") && (u.includes("exec") || u.includes("president")) && (u.includes("judici") || u.includes("court"));
   }
@@ -564,7 +563,7 @@ function gradeAnswer(question, userAnswer) {
   return question.answers.some(ans => containsAnswer(u, ans));
 }
 
-// ─── AI Grading ─────────────────────────────────────────────────────────────────────────────
+// ─── AI Grading ───────────────────────────────────────────────────────────────
 let anthropicApiKey = "";
 
 function saveApiKey() {
@@ -629,7 +628,7 @@ Reply with exactly one word: CORRECT or INCORRECT`;
   return verdict.includes("CORRECT");
 }
 
-// ─── App State ──────────────────────────────────────────────────────────────────────────────
+// ─── App State ────────────────────────────────────────────────────────────────
 let allQuestions = [];
 let quizQuestions = [];
 let currentIndex = 0;
@@ -639,7 +638,7 @@ let selectedCount = 20;
 let selectedMode = "all";
 let answered = false;
 
-// ─── Setup ─────────────────────────────────────────────────────────────────────────────────
+// ─── Setup ────────────────────────────────────────────────────────────────────
 function lookupZip() {
   const zip = document.getElementById("zip-input").value.trim();
   const stateCode = getStateFromZip(zip);
@@ -686,7 +685,7 @@ function startQuiz() {
   showQuestion();
 }
 
-// ─── Quiz Logic ────────────────────────────────────────────────────────────────────────────
+// ─── Quiz Logic ───────────────────────────────────────────────────────────────
 function showQuestion() {
   answered = false;
   const q = quizQuestions[currentIndex];
@@ -824,7 +823,7 @@ function nextQuestion() {
   }
 }
 
-// ─── Results ───────────────────────────────────────────────────────────────────────────────
+// ─── Results ──────────────────────────────────────────────────────────────────
 function showResults() {
   document.getElementById("quiz-screen").style.display = "none";
   document.getElementById("results-screen").style.display = "block";
@@ -865,7 +864,7 @@ function restart() {
   document.getElementById("zip-input").value = "";
 }
 
-// ─── Keyboard shortcut ────────────────────────────────────────────────────────────────────────
+// ─── Keyboard shortcut ────────────────────────────────────────────────────────
 document.addEventListener("keydown", function(e) {
   if (e.key === "Enter" && !e.shiftKey) {
     const submitBtn = document.getElementById("submit-btn");
